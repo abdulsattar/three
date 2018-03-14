@@ -20,10 +20,14 @@ float readDepth (sampler2D depthSampler, vec2 coord) {
 }
 
 void main() {
-  float oldDepth = readDepth(tDepth, vUv);
-  float fragCoordZ = gl_FragCoord.z;
-  float viewZ = perspectiveDepthToViewZ( fragCoordZ, cameraNear, cameraFar );
-  float currentDepth = viewZToOrthographicDepth( viewZ, cameraNear, cameraFar );
+  // float depth = texture2D(tDepth, vUv).r;
+  float depth = gl_FragCoord.z;
+  gl_FragColor = vec4(depth * 2.0 - 1.0, depth * 2.0 - 1.0, 0, 1.0);
+  return;
+  // float oldDepth = readDepth(tDepth, vUv);
+  // float fragCoordZ = gl_FragCoord.z;
+  // float viewZ = perspectiveDepthToViewZ( fragCoordZ, cameraNear, cameraFar );
+  // float currentDepth = viewZToOrthographicDepth( viewZ, cameraNear, cameraFar );
   // if (oldDepth > gl_FragCoord.z) {
   //   discard;
   //   return;
@@ -32,17 +36,31 @@ void main() {
   //   // gl_FragColor = vec4(1, 0, 0, 1);
   //   discard;
   // } else {
-    gl_FragColor = vec4(0.18, 0.18, 0.18, 1);
+  // float depth = texture2D(tDepth, vUv).r;
+  // gl_FragColor = texture2D(tDiffuse, vUv);
+  // gl_FragColor = vec4(depth, depth, 0, 1.0);
   // }
 }
 `;
 
 const frameFragmentShader = `
+#include <packing>
 varying vec2 vUv;
 uniform sampler2D tDiffuse;
+uniform sampler2D tDepth;
+uniform float cameraNear;
+uniform float cameraFar;
+
+float readDepth (sampler2D depthSampler, vec2 coord) {
+  float fragCoordZ = texture2D(depthSampler, coord).x;
+  float viewZ = perspectiveDepthToViewZ( fragCoordZ, cameraNear, cameraFar );
+  return viewZToOrthographicDepth( viewZ, cameraNear, cameraFar );
+}
 
 void main() {
-  gl_FragColor = texture2D(tDiffuse, vUv);
+  float depth = texture2D(tDepth, vUv).r;
+  // gl_FragColor = texture2D(tDiffuse, vUv);
+  gl_FragColor = vec4(depth * 2.0 - 1.0, depth * 2.0 - 1.0, 0, 1.0);
 }
 `;
 
@@ -88,7 +106,9 @@ function createFrameScene() {
     uniforms: {
       tDiffuse: { value: target.texture },
       tDepth: { value: target.depthTexture },
-      resolution: { value: new THREE.Vector2(1 / 1024, 1 / 512) }
+      resolution: { value: new THREE.Vector2(1 / 1024, 1 / 512) },
+      cameraNear: { value: camera.near },
+      cameraFar: { value: camera.far }
     },
     vertexShader: commonVertexShader,
     fragmentShader: frameFragmentShader,
@@ -139,14 +159,21 @@ function createTargets() {
   document.body.appendChild(renderer.domElement);
 }
 
+function getDeltaCamera(camera) {
+  const deltaCamera = camera.clone();
+  deltaCamera.position.add(deltaCamera.getWorldDirection().multiplyScalar(0.1));
+  return deltaCamera;
+}
 var animate = function() {
   requestAnimationFrame(animate);
 
   renderer.clearTarget(target, true, true, true);
   renderer.clear(true, true, true);
   renderer.render(scene, camera, target);
+  // const _gl = renderer.context;
+  // _gl.framebufferTexture2D( _gl.FRAMEBUFFER, _gl.DEPTH_ATTACHMENT, _gl.TEXTURE_2D, null, 0 );
   renderer.render(frameScene, frameCamera);
-  // renderer.clearDepth();
+  renderer.clearDepth();
   renderer.render(edgesScene, camera);
 };
 
